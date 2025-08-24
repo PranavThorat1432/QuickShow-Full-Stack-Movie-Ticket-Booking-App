@@ -1,21 +1,27 @@
 import React, { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { dummyDateTimeData, dummyShowsData } from '../assets/assets';
 import BlurCircle from '../Components/BlurCircle';
 import { Heart, PlayCircle, StarIcon } from 'lucide-react';
 import timeFormat from '../Lib/TimeFormat';
+import DateSelect from '../Components/DateSelect';
+import MovieCard from '../Components/MovieCard'
+import Loading from '../Components/Loading';
 
 const MovieDetails = () => {
 
+  const navigate = useNavigate();
   const {id} = useParams();
   const [show, setShow] = useState(null);
 
   const getShow = async () => {
     const show = dummyShowsData.find(show => show._id === id);
-    setShow({
-      movie: show,
-      dateTime: dummyDateTimeData
-    })
+    if(show) {
+      setShow({
+        movie: show,
+        dateTime: dummyDateTimeData
+      })
+    }
   }
 
   useEffect(() => {
@@ -57,7 +63,7 @@ const MovieDetails = () => {
         </div>
       </div>
 
-      <p>Your Favourite Cast</p>
+      <p className='text-lg font-medium mt-20 mb-8'>Your Favourite Cast</p>
       <div className='overflow-x-auto no-scrollbar mt-8 pb-4'>
         <div className='flex items-center gap-4 w-max px-4'>
           {show.movie.casts.slice(0, 12).map((cast, index) => (
@@ -68,9 +74,21 @@ const MovieDetails = () => {
           ))}
         </div>
       </div>
+
+      <DateSelect dateTime={show.dateTime} id={id}/>
+
+      <p className='text-lg font-medium mt-20 mb-8'>You May Also Like</p>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'>
+          {dummyShowsData.slice(0, 4).map((movie, index) => (
+            <MovieCard key={index} movie={movie}/>
+          ))}
+      </div>
+      <div className='flex justify-center mt-20'>
+          <button onClick={() => {navigate('/movies'); scrolllTo(0,0)}} className='px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-md font-medium cursor-pointer'>Show More</button>
+      </div>
     </div>
   ) : (
-    <div>Loading...</div>
+    <Loading/>
   )
 }
 
