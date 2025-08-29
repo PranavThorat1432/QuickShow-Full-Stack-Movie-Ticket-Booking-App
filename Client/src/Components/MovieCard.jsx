@@ -1,7 +1,7 @@
 import { StarIcon } from 'lucide-react';
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import timeFormat from '../Lib/TimeFormat';
+import {timeFormat} from '../Lib/timeFormat';
 
 const MovieCard = ({movie}) => {
     const navigate = useNavigate();
