@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { dummyDateTimeData, dummyShowsData } from '../assets/assets';
 import BlurCircle from '../Components/BlurCircle';
 import { Heart, PlayCircle, StarIcon } from 'lucide-react';
-import timeFormat from '../Lib/TimeFormat';
+import {timeFormat} from '../Lib/timeFormat';
 import DateSelect from '../Components/DateSelect';
 import MovieCard from '../Components/MovieCard'
 import Loading from '../Components/Loading';
