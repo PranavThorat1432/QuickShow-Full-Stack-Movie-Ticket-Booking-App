@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 //MongoDB Connection
 const connectDB = async () => {
     mongoose.connect( process.env.MONGODB_URI, {
-        dbName: "QuickShow: Movie Ticket Booking App"
+        dbName: "QuickShow"
     }).then(() => {
         console.log("MongoDB Connected..!")
     }).catch((err) => {
