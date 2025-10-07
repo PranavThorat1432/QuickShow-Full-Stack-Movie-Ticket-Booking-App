@@ -1,23 +1,36 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { clerkMiddleware } from '@clerk/express'
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { clerkMiddleware } from '@clerk/express';
 import connectDB from './configs/mongodb.js';
 import { serve } from "inngest/express";
-import { inngest, functions } from "./inngest/index.js"
+import { inngest, functions } from "./inngest/index.js";
 import showRouter from './routes/showRoutes.js';
 import bookingRouter from './routes/bookingRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 import userRouter from './routes/userRoutes.js';
 import { stripeWebhooks } from './controllers/stripewebhooks.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Middleware
 app.use(express.json());
 app.use(cors());
 app.use(clerkMiddleware());
+
+// Handle favicon.ico
+app.get('/favicon.ico', (req, res) => {
+    res.status(204).end(); // Return 204 No Content for favicon.ico
+});
 
 // API Routes
 app.get('/', (req, res) => {
@@ -37,12 +50,39 @@ app.use('/api/admin', adminRouter);
 app.use('/api/user', userRouter);
 app.use('/api/stripe', express.raw({type: 'application/json'}), stripeWebhooks);
 
+// 404 Handler
+app.use((req, res, next) => {
+    res.status(404).json({
+        status: 'error',
+        message: 'Not Found',
+        path: req.path
+    });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ 
-        error: 'Something went wrong!',
-        message: process.env.NODE_ENV === 'production' ? null : err.message 
+    console.error('Error:', {
+        message: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        path: req.path,
+        method: req.method
+    });
+
+    // Handle specific error types
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({
+            status: 'error',
+            message: 'Validation Error',
+            errors: err.errors
+        });
+    }
+
+    // Default error response
+    res.status(err.status || 500).json({
+        status: 'error',
+        message: process.env.NODE_ENV === 'production' 
+            ? 'Something went wrong!'
+            : err.message || 'Internal Server Error'
     });
 });
 
