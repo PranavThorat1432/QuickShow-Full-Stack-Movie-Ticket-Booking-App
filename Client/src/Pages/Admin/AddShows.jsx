@@ -1,11 +1,16 @@
-import React, { useEffect, useState } from 'react'
+import ImageWithFallback from '../../Components/ImageWithFallback';
 import { dummyShowsData } from '../../assets/assets';
 import Loading from '../../Components/Loading';
 import Title from '../../Components/Admin/Title';
 import { CheckIcon, DeleteIcon, StarIcon } from 'lucide-react';
 import { kConverter } from '../../Lib/kConverter';
+import { useAppContext } from '../../Context/AppContext';
+import toast from 'react-hot-toast';
+import { useEffect, useState } from 'react';
 
 const AddShows = () => {
+
+  const {axios, getToken, user, image_base_url, triggerRefetch} = useAppContext();
 
   const currency = import.meta.env.VITE_CURRENCY;
   const [nowPlayingMovies, setNowPlayingMovies] = useState([]);
@@ -13,9 +18,18 @@ const AddShows = () => {
   const [dateTimeSelection, setDateTimeSelection] = useState({});
   const [dateTimeInput, setDateTimeInput] = useState('');
   const [showPrice, setShowPrice] = useState('');
+  const [addingShow, setAddingShow] = useState(false);
 
   const fetchNowPlayingMovies = async () => {
-    setNowPlayingMovies(dummyShowsData);
+    try {
+      const {data} = await axios.get('/api/show/now-playing', {headers: {Authorization: `Bearer ${await getToken()}`}});
+      if(data.success) {
+        setNowPlayingMovies(data.movies);
+      }
+
+    } catch (error) {
+      console.error('Error in Fetching Movies: ', error)
+    }
   };
 
   const handleDateTimeAdd = () => {
@@ -48,9 +62,92 @@ const AddShows = () => {
     });
   };
 
+  const handleSubmit = async () => {
+    try {
+      setAddingShow(true);
+
+      if(!selectedMovie || Object.keys(dateTimeSelection).length === 0 || !showPrice) {
+        return toast.error('Please fill in all required fields');
+      }
+
+      const showsInput = Object.entries(dateTimeSelection).map(([date, time]) => ({
+        date,
+        time,
+        totalSeats: 100,  // Add default total seats
+        availableSeats: 100 // Add default available seats
+      }));
+
+      const payload = {
+        movieId: selectedMovie,
+        showsInput,
+        showPrice: Number(showPrice)
+      };
+
+      // Add timeout to prevent hanging on slow connections
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      try {
+        const {data} = await axios.post('/api/show/add-show', payload, {
+          headers: {
+            'Authorization': `Bearer ${await getToken()}`,
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if(data.success) {
+          toast.success(data.message || 'Show added successfully!');
+          setSelectedMovie(null);
+          setDateTimeSelection({});
+          setShowPrice('');
+          triggerRefetch();
+        } else {
+          toast.error(data.message || 'Failed to add show. Please try again.');
+        }
+      } catch (error) {
+        clearTimeout(timeoutId);
+        
+        if (error.code === 'ECONNABORTED' || error.message === 'Network Error') {
+          toast.error('Request timed out. Please check your connection and try again.');
+        } else if (error.response) {
+          // Server responded with an error status code (4xx, 5xx)
+          const errorMsg = error.response.data?.message || 'Server error occurred';
+          toast.error(`Error: ${errorMsg}`);
+        } else if (error.request) {
+          // Request was made but no response received
+          toast.error('No response from server. Please try again later.');
+        } else {
+          // Something else happened
+          toast.error(`Error: ${error.message}`);
+        }
+        
+        console.error('Show submission error:', {
+          message: error.message,
+          code: error.code,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+            data: error.config?.data
+          },
+          response: error.response?.data
+        });
+      }
+    } catch (error) {
+      console.error('Unexpected error in handleSubmit:', error);
+      toast.error('An unexpected error occurred. Please try again.');
+    } finally {
+      setAddingShow(false);
+    }
+  }
+
   useEffect(() => {
-    fetchNowPlayingMovies();
-  }, [])
+    if(user) {
+      fetchNowPlayingMovies();
+    }
+  }, [user]);
 
   return nowPlayingMovies.length > 0 ? (
     <>
@@ -62,7 +159,7 @@ const AddShows = () => {
           {nowPlayingMovies.map((movie) => (
             <div key={movie.id} className={`relative max-w-40 cursor-pointer group-hover:not-hover:opacity-40 hover:-translate-y-1 transition duration-300`} onClick={() => setSelectedMovie(movie.id)}>
               <div className='relative rounded-lg overflow-hidden'>
-                <img src={movie.poster_path} alt="" className='w-full object-cover brightness-90'/>
+                <ImageWithFallback src={image_base_url + movie.poster_path} alt={movie.title} className='w-full object-cover brightness-90'/>
                 <div className='text-sm flex items-center justify-between p-2 bg-black/70 w-full absolute bottom-0 left-0'>
                   <p className='flex items-center gap-1 text-gray-400'>
                     <StarIcon className='w-4 h-4 text-primary fill-primary'/>
@@ -122,7 +219,7 @@ const AddShows = () => {
           </ul>
         </div>
       )}
-      <button className='bg-primary text-white px-8 py-2 mt-6 rounded hover:bg-primary/90 transition-all cursor-pointer'>Add Show</button>
+      <button onClick={handleSubmit} disabled={addingShow} className='bg-primary text-white px-8 py-2 mt-6 rounded hover:bg-primary/90 transition-all cursor-pointer'>Add Show</button>
     </>
   ) : <Loading/>
 }
