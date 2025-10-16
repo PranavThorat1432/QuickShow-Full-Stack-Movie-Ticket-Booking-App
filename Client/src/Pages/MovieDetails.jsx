@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import ImageWithFallback from '../Components/ImageWithFallback';
 import { useNavigate, useParams } from 'react-router-dom'
-import { dummyDateTimeData, dummyShowsData } from '../assets/assets';
 import BlurCircle from '../Components/BlurCircle';
 import { Heart, PlayCircle, StarIcon } from 'lucide-react';
 import {timeFormat} from '../Lib/timeFormat';
 import DateSelect from '../Components/DateSelect';
 import MovieCard from '../Components/MovieCard'
 import Loading from '../Components/Loading';
+import { useEffect, useState } from 'react';
+import { useAppContext } from '../Context/AppContext';
+import toast from 'react-hot-toast';
 
 const MovieDetails = () => {
 
@@ -14,13 +16,33 @@ const MovieDetails = () => {
   const {id} = useParams();
   const [show, setShow] = useState(null);
 
+  const {shows, axios, getToken, user, favoriteMovies, fetchFavoriteMovies, image_base_url} = useAppContext();
+
   const getShow = async () => {
-    const show = dummyShowsData.find(show => show._id === id);
-    if(show) {
-      setShow({
-        movie: show,
-        dateTime: dummyDateTimeData
-      })
+    try {
+      const {data} = await axios.get(`/api/show/${id}`)
+      if(data.success) {
+        setShow(data)
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  const handleFavorite = async () => {
+    try {
+      if(!user) {
+        return toast.error('Please Login to add to favourites')
+      }
+
+      const {data} = await axios.post('/api/user/updateFavorite', {movieId: id}, {headers: {Authorization: `Bearer ${await getToken()}`}})
+
+      if(data.success) {
+        await fetchFavoriteMovies();
+        toast.success(data.message);
+      }
+    } catch (error) {
+      console.log(error);
     }
   }
 
@@ -32,7 +54,7 @@ const MovieDetails = () => {
     <div className='px-6 md:px-16 lg:px-40 pt-30 md:pt-50'>
       <div className='flex flex-col md:flex-row gap-8 max-w-6xl mx-auto'>
 
-        <img src={show.movie.poster_path} alt="" className='max-md:mx-auto rounded-xl h-104 max-w-70 object-cover'/>
+        <ImageWithFallback src={image_base_url + show.movie.poster_path} alt={show.movie.title} className='max-md:mx-auto rounded-xl h-104 max-w-70 object-cover'/>
 
         <div className='relative flex flex-col gap-3'>
           <BlurCircle top='-100px' left='-100px'/>
@@ -55,8 +77,8 @@ const MovieDetails = () => {
               Watch Trailer
             </button>
             <a href="#dateSelect" className='px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-md font-medium cursor-pointer active:scale-95'>Buy Tickets</a>
-            <button className='bg-gray-700 p-2.5 rounded-full transition cursor-pointer active:scale-95'>
-              <Heart className={`w-5 h-5`}/>
+            <button onClick={handleFavorite} className='bg-gray-700 p-2.5 rounded-full transition cursor-pointer active:scale-95'>
+              <Heart className={`w-5 h-5 ${Array.isArray(favoriteMovies) && favoriteMovies.find(movie => String(movie._id) === String(show.movie._id)) ? 'fill-primary text-primary' : ''}`}/>
             </button>
           </div>
 
@@ -68,7 +90,7 @@ const MovieDetails = () => {
         <div className='flex items-center gap-4 w-max px-4'>
           {show.movie.casts.slice(0, 12).map((cast, index) => (
             <div key={index} className='flex flex-col items-center text-center'>
-              <img className='rounded-full h-20 md:h-20 aspect-square object-cover' src={cast.profile_path} alt="" />
+              <ImageWithFallback className='rounded-full h-20 md:h-20 aspect-square object-cover' src={image_base_url + cast.profile_path} alt={cast.name} />
               <p className='font-medium text-xs mt-3'>{cast.name}</p>
             </div>
           ))}
@@ -79,12 +101,12 @@ const MovieDetails = () => {
 
       <p className='text-lg font-medium mt-20 mb-8'>You May Also Like</p>
       <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6'>
-          {dummyShowsData.slice(0, 4).map((movie, index) => (
+          {shows.slice(0, 4).map((movie, index) => (
             <MovieCard key={index} movie={movie}/>
           ))}
       </div>
       <div className='flex justify-center mt-20'>
-          <button onClick={() => {navigate('/movies'); scrolllTo(0,0)}} className='px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-md font-medium cursor-pointer'>Show More</button>
+          <button onClick={() => {navigate('/movies'); window.scrollTo(0,0)}} className='px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-md font-medium cursor-pointer'>Show More</button>
       </div>
     </div>
   ) : (
